@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendify - Dynamic Dashboard</title>
+    <link rel="icon" href="data:,">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- 1. Load jsPDF -->
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <!-- 2. Load AutoTable (Matches jsPDF version) -->
+    <script src="https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #06080d; 
+            color: #ffffff;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 280px;
+            background-color: #0a0e17; 
+            border-right: 1px solid #1f2937;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 5px;
+        }
+
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon {
+            background-color: #2563eb; color: white;
+            font-weight: 800; font-size: 18px;
+            padding: 6px 10px; border-radius: 8px;
+        }
+        .logo-text { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+
+        .theme-toggle {
+            background-color: #1e2532; border: none; color: #9ca3af;
+            width: 38px; height: 38px; border-radius: 10px;
+            cursor: pointer; transition: 0.3s;
+        }
+        .theme-toggle:hover { background-color: #2d3748; color: white; }
+
+        .nav-links { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+
+        .nav-item a {
+            display: flex; align-items: center; gap: 16px;
+            text-decoration: none; color: #e2e8f0;
+            padding: 14px 18px; border-radius: 12px;
+            font-size: 16px; font-weight: 600; transition: all 0.2s ease;
+        }
+        .nav-item a i { font-size: 18px; width: 24px; text-align: center; opacity: 0.8; }
+
+        .nav-item:not(.active) a:hover { background-color: #1a2234; color: #ffffff; }
+        .nav-item.active a { background-color: #2563eb; color: #ffffff; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+
+        /* Main Content Area Styling */
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            background-color: #06080d;
+            overflow-y: auto;
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        .content-section.active-section {
+            display: block;
+        }
+
+        h1 { font-size: 32px; margin-bottom: 10px; }
+        p { color: #9ca3af; font-size: 16px; }
+        
+        .card {
+            background-color: #111827;
+            border: 1px solid #1f2937;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Form Styles */
+        .form-group { margin-bottom: 1.5rem; }
+        .form-row { display: flex; gap: 1rem; }
+        .form-group label {
+            display: block; margin-bottom: 0.5rem;
+            font-weight: 600; color: #e2e8f0;
+        }
+        .form-group input, .form-group select {
+            width: 100%; max-width: 300px;
+            background-color: #1e2532;
+            border: 1px solid #374151; color: white;
+            padding: 0.75rem 1rem; border-radius: 8px; font-size: 16px;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none; border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            background-color: #2563eb; color: white;
+            border: none; padding: 0.75rem 1.5rem;
+            border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background-color 0.2s;
+        }
+        .btn:hover { background-color: #1d4ed8; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #374151; }
+        th { background-color: #1e2532; font-weight: 600; color: #e2e8f0; }
+        .status-present { color: #4ade80; font-weight: 600; }
+        .status-absent { color: #f87171; font-weight: 600; }
+
+        @media (max-width: 768px) {
+            .sidebar { width: 250px; }
+            .main-content { padding: 24px 20px; }
+            h1 { font-size: 28px; }
+            .card { padding: 24px; }
+            .form-group input, .form-group select { max-width: 100%; }
+        }
+
+        @media (max-width: 480px) {
+            body { flex-direction: column; overflow-y: auto; }
+            .sidebar {
+                width: 100%; height: auto; flex-direction: row;
+                overflow-x: auto; padding: 16px; border-right: none;
+                border-bottom: 1px solid #1f2937; gap: 0;
+            }
+            .sidebar-header { display: none; }
+            .nav-links { flex-direction: row; gap: 4px; }
+            .nav-item a { padding: 12px 16px; font-size: 14px; white-space: nowrap; }
+            .main-content { padding: 16px; flex: none; }
+            h1 { font-size: 24px; }
+            .card { padding: 20px 16px; border-radius: 8px; }
+            .form-row { flex-direction: column; gap: 12px; }
+            .form-group input, .form-group select { max-width: 100%; padding: 14px; }
+            table { display: block; overflow-x: auto; white-space: nowrap; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">A+</span>
+                <span class="logo-text">Attendify</span>
+            </div>
+            <button class="theme-toggle"><i class="fa-regular fa-sun"></i></button>
+        </div>
+        
+        <ul class="nav-links">
+            <li class="nav-item" data-target="mark-attendance-view">
+                <a href="#">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span>Mark Attendance</span>
+                </a>
+            </li>
+            <li class="nav-item" data-target="students-view">
+                <a href="#">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Students</span>
+                </a>
+            </li>
+            <li class="nav-item active" data-target="dashboard-view">
+                <a href="#">
+                    <i class="fa-solid fa-table-cells-large"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item" data-target="timetable-view">
+                <a href="#">
+                    <i class="fa-regular fa-calendar"></i>
+                    <span>Time Table</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <main class="main-content">
+        <div id="dashboard-view" class="content-section active-section">
+            <h1>Dashboard</h1>
+            <div class="card">
+                <h2 id="totalStudents">Total Students: 0</h2>
+                <p id="presentToday" style="margin-top: 10px; color: #4ade80;">Present Today: 0</p>
+                <p id="absentToday" style="margin-top: 5px; color: #f87171;">Absent Today: 0</p>
+            </div>
+        </div>
+
+        <div id="timetable-view" class="content-section">
+            <h1>Time Table</h1>
+            <div class="card">
+                <h3 style="color: #60a5fa; margin-bottom: 15px;">Weekly Schedule</h3>
+                <p>Time table content will be here.</p>
+            </div>
+        </div>
+
+        <div id="mark-attendance-view" class="content-section">
+            <h1>Mark Attendance</h1>
+            <p>Select a class and start taking attendance.</p>
+            <div class="card">
+                <h2>Mark Attendance</h2>
+                <p>Mark attendance for today:</p>
+                <button class="btn" onclick="exportAttendancePDF()" style="margin-top: 1rem;">Export PDF</button>
+            </div>
+
+            <div class="card">
+                <h2>Mark Attendance for Students</h2>
+                <table id="attendanceStudentsTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Present</th>
+                            <th>Absent</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div class="card" style="margin-top: 20px;">
+                <h2>Today's Attendance Summary</h2>
+                <table id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="students-view" class="content-section">
+            <h1>Students</h1>
+            <p>Add and manage students.</p>
+
+            <div class="card">
+                <h2>Import from Google Sheets</h2>
+                <div class="form-group">
+                    <label>Google Sheet CSV Export URL:</label>
+                    <input type="url" id="googleSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv">
+                    <p style="color: #9ca3af; font-size: 14px; margin-top: 0.5rem;">Make sheet public, File > Share > Publish to web > CSV format. Columns: Name,Roll No,Enrollment No</p>
+                </div>
+                <button class="btn" onclick="importFromGoogleSheets()">Import Students</button>
+            </div>
+
+            <div class="card">
+                <h2>Add Single Student</h2>
+                <div class="form-group">
+                    <label>Name:</label>
+                    <input type="text" id="studentName" placeholder="Enter student name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Roll No:</label>
+                        <input type="text" id="studentRoll" placeholder="Enter roll no">
+                    </div>
+                    <div class="form-group" style="flex: 1; margin-left: 1rem;">
+                        <label>Enrollment No:</label>
+                        <input type="text" id="studentEnroll" placeholder="Enter enrollment no">
+                    </div>
+                </div>
+                <button class="btn" id="addStudentBtn">Add Student</button>
+            </div>
+
+            <div class="card">
+                <h2>Students List</h2>
+                <table id="studentsTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>ID</th>
+                            <th>Type</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Navigation ---
+        const navItems = document.querySelectorAll('.nav-item');
+        const contentSections = document.querySelectorAll('.content-section');
+
+        navItems.forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault(); 
+                navItems.forEach(nav => nav.classList.remove('active'));
+                this.classList.add('active');
+                
+                const targetId = this.getAttribute('data-target');
+                contentSections.forEach(section => section.classList.remove('active-section'));
+                document.getElementById(targetId).classList.add('active-section');
+                
+                if (targetId === 'students-view') loadStudents();
+                if (targetId === 'mark-attendance-view') {
+                    loadAttendanceStudents();
+                    loadAttendanceSummary();
+                }
+            });
+        });
+
+        // --- Data Storage ---
+        const STORAGE_KEYS = {
+            students: 'attendify_students',
+            attendance: 'attendify_attendance'
+        };
+
+        // --- Student Management ---
+        function addStudent() {
+            const name = document.getElementById('studentName').value.trim();
+            if (!name) return alert('Name is required');
+            
+            const rollNo = document.getElementById('studentRoll').value.trim();
+            const enrollNo = document.getElementById('studentEnroll').value.trim();
+            
+            if (rollNo || enrollNo) {
+                const idValue = rollNo || enrollNo;
+                const idType = rollNo && enrollNo ? 'both' : (rollNo ? 'roll' : 'enroll');
+                
+                const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+                students.push({
+                    id: Date.now().toString(),
+                    name, rollNo, enrollNo, idType, idValue
+                });
+                
+                localStorage.setItem(STORAGE_KEYS.students, JSON.stringify(students));
+                
+                document.getElementById('studentName').value = '';
+                document.getElementById('studentRoll').value = '';
+                document.getElementById('studentEnroll').value = '';
+                
+                loadStudents();
+                alert('Student added successfully!');
+            } else {
+                alert('Please enter Roll No or Enrollment No');
+            }
+        }
+
+        function deleteStudent(studentId) {
+            if (confirm('Are you sure?')) {
+                let students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+                students = students.filter(s => s.id !== studentId);
+                localStorage.setItem(STORAGE_KEYS.students, JSON.stringify(students));
+                loadStudents();
+            }
+        }
+
+        function loadStudents() {
+            const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+            const tbody = document.querySelector('#studentsTable tbody');
+            tbody.innerHTML = students.map(student => `
+                <tr>
+                    <td>${student.name}</td>
+                    <td>${student.idValue || 'N/A'}</td>
+                    <td>${student.idType.toUpperCase()}</td>
+                    <td><button class="btn btn-danger" onclick="deleteStudent('${student.id}')">Delete</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function importFromGoogleSheets() {
+            alert("Google Sheets import feature is coming soon!");
+        }
+
+        // --- Attendance Management ---
+        function markAttendance(studentId, status) {
+            const today = new Date().toISOString().split('T')[0];
+            let attendance = JSON.parse(localStorage.getItem(STORAGE_KEYS.attendance) || '[]');
+            
+            attendance = attendance.filter(a => a.studentId !== studentId || a.date !== today);
+            attendance.push({ studentId, status, date: today });
+            localStorage.setItem(STORAGE_KEYS.attendance, JSON.stringify(attendance));
+            
+            loadAttendanceStudents(); 
+            loadAttendanceSummary();
+            updateDashboard();
+        }
+
+        function loadAttendanceStudents() {
+            const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+            const today = new Date().toISOString().split('T')[0];
+            const attendance = JSON.parse(localStorage.getItem(STORAGE_KEYS.attendance) || '[]').filter(a => a.date === today);
+            
+            const attendanceMap = {};
+            attendance.forEach(a => attendanceMap[a.studentId] = a.status);
+            
+            const tbody = document.querySelector('#attendanceStudentsTable tbody');
+            tbody.innerHTML = students.map(student => {
+                const currentStatus = attendanceMap[student.id] || 'none';
+                const idValue = student.idValue || 'N/A';
+                return `
+                    <tr>
+                        <td>${student.name}</td>
+                        <td>${idValue}</td>
+                        <td>${student.idType.toUpperCase()}</td>
+                        <td><button class="btn" onclick="markAttendance('${student.id}', 'present')" ${currentStatus === 'present' ? 'disabled style="opacity:0.5"' : ''}>Present</button></td>
+                        <td><button class="btn btn-danger" onclick="markAttendance('${student.id}', 'absent')" ${currentStatus === 'absent' ? 'disabled style="opacity:0.5"' : ''}>Absent</button></td>
+                        <td><span class="status-${currentStatus}">${currentStatus === 'none' ? 'Pending' : currentStatus.toUpperCase()}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadAttendanceSummary() {
+            const today = new Date().toISOString().split('T')[0];
+            const attendance = JSON.parse(localStorage.getItem(STORAGE_KEYS.attendance) || '[]').filter(a => a.date === today);
+            const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+            
+            const studentMap = {};
+            students.forEach(s => studentMap[s.id] = s);
+            
+            const tbody = document.querySelector('#attendanceTable tbody');
+            tbody.innerHTML = attendance.map(record => {
+                const student = studentMap[record.studentId];
+                return `
+                    <tr>
+                        <td>${student ? student.name : 'Unknown'}</td>
+                        <td><span class="status-${record.status}">${record.status.toUpperCase()}</span></td>
+                        <td>${record.date}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadAttendanceSummaryData() {
+            const today = new Date().toISOString().split('T')[0];
+            const attendance = JSON.parse(localStorage.getItem(STORAGE_KEYS.attendance) || '[]').filter(a => a.date === today);
+            const attendanceMap = {};
+            attendance.forEach(a => attendanceMap[a.studentId] = a.status);
+            
+            const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+            
+            return students.map(student => {
+                const status = attendanceMap[student.id] || 'Pending';
+                const idValue = student.idValue || 'N/A';
+                return [student.name, idValue, status.toUpperCase()];
+            });
+        }
+
+        // --- Dashboard & Export ---
+        function updateDashboard() {
+            const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+            const today = new Date().toISOString().split('T')[0];
+            const attendance = JSON.parse(localStorage.getItem(STORAGE_KEYS.attendance) || '[]').filter(a => a.date === today);
+            
+            const present = attendance.filter(a => a.status === 'present').length;
+            const absent = students.length - present;
+            
+            document.getElementById('totalStudents').textContent = `Total Students: ${students.length}`;
+            document.getElementById('presentToday').textContent = `Present Today: ${present}`;
+            document.getElementById('absentToday').textContent = `Absent Today: ${absent}`;
+        }
+
+        function exportAttendancePDF() {
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert('PDF library failed to load. Please check your internet connection and refresh the page.');
+                return;
+            }
+            
+            try {
+                // Initialize jsPDF correctly using UMD structure
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const today = new Date().toISOString().split('T')[0];
+                
+                // Add document title
+                doc.text(`Attendance Report - ${today}`, 14, 22);
+                
+                // Trigger autoTable
+                doc.autoTable({
+                    startY: 30,
+                    head: [['Name', 'ID', 'Status']],
+                    body: loadAttendanceSummaryData()
+                });
+                
+                // Download file
+                doc.save(`attendance_${today}.pdf`);
+                
+            } catch (error) {
+                console.error('PDF Export Error:', error);
+                alert('PDF export failed. Check console for details.');
+            }
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('addStudentBtn').addEventListener('click', addStudent);
+            
+            loadStudents();
+            loadAttendanceStudents();
+            loadAttendanceSummary();
+            updateDashboard();
+        });
+    </script>
+</body>
+</html>
